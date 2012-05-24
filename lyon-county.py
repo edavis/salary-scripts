@@ -19,13 +19,9 @@ skip = ('Report No',
 employees = {}
 current_name = None
 
-def clean_amount(s):
-    s = s.replace(',', '')
-    if '-' in s:
-        s = Decimal(s[1:]) * Decimal(-1)
-    else:
-        s = Decimal(s)
-    return s
+def grab_amount(line):
+    val = re.search('([\d,]*\.\d\d)', line).group(1)
+    return Decimal(val.replace(',', ''))
 
 with open(args.input) as fp:
     for line in fp:
@@ -40,16 +36,13 @@ with open(args.input) as fp:
             employees[current_name] = {'title': title.rstrip()}
 
         elif 'TOTAL OVERTIME PAY' in line:
-            val = re.search('([\d,]*\.\d\d)', line).group(1)
-            employees[current_name]['overtime'] = clean_amount(val)
+            employees[current_name]['overtime'] = grab_amount(line)
 
         elif 'TOTAL GROSS PAY' in line:
-            val = re.search('([\d,]*\.\d\d)', line).group(1)
-            employees[current_name]['gross'] = clean_amount(val)
+            employees[current_name]['gross'] = grab_amount(line)
 
         elif 'TOTAL EMPLOYER-PAID BENEFITS' in line:
-            val = re.search('([\d,]*\.\d\d)', line).group(1)
-            employees[current_name]['benefits'] = clean_amount(val)
+            employees[current_name]['benefits'] = grab_amount(line)
 
 data = tablib.Dataset(headers=('Name', 'Title', 'Gross', 'Overtime', 'Benefits'))
 for name, fields in employees.iteritems():
