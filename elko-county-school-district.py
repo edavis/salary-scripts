@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import re
+import csv
 import tablib
 import argparse
 from decimal import Decimal
@@ -11,29 +12,41 @@ parser.add_argument("-o", "--output", default="output.csv")
 parser.add_argument("input")
 args = parser.parse_args()
 
-input_csv = tablib.Dataset(headers=None)
-with open(args.input) as fp:
-    input_csv.csv = fp.read()
-
 employees = {}
+employee_titles = {}
 current_name = None
-for row in input_csv:
-    if row[0]:
-        current_name = row[0]
-        employees[current_name] = defaultdict(Decimal)
 
-    if row[3]:
-        value = Decimal(row[3].replace(',', '') or 0)
-        employees[current_name]['gross'] += value
+with open(args.input) as fp:
+    reader = csv.reader(fp)
+    next(reader)
 
-    elif row[4]:
-        value = Decimal(row[4].replace(',', '') or 0)
-        employees[current_name]['benefits'] += value
+    for (idx, row) in enumerate(reader):
+        (name, desc, is_base_pay, value) = row
 
-output = tablib.Dataset(headers=('Name', 'Gross', 'Benefits'))
-for name, fields in employees.iteritems():
-    output.append([name, fields.get('gross'), fields.get('benefits')])
+        if name:
+            current_name = name
+            employees[current_name] = defaultdict(Decimal)
+
+        if desc.startswith('Benefits -'):
+            employees[current_name]['Benefits'] += Decimal(value)
+        elif is_base_pay:
+            employees[current_name]['Base Pay'] += Decimal(value)
+            employee_titles[current_name] = desc.split(' - ', 1)[-1]
+        else:
+            employees[current_name][desc] += Decimal(value)
+
+descriptions = set()
+for figures in employees.itervalues():
+    for key in figures.iterkeys():
+        descriptions.add(key)
 
 with open(args.output, 'wb') as fp:
-    fp.write(output.csv)
+    data = tablib.Dataset(headers=['Name', 'Job Title'] + sorted(descriptions))
+    for name, figures in employees.iteritems():
+        current = [name, employee_titles.get(name, 'NOT PROVIDED')]
+        for desc in sorted(descriptions):
+            value = figures.get(desc, 0)
+            current.append(value)
+        data.append(current)
+    fp.write(data.csv)
 
